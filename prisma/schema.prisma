@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  CR
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  studentId String?  @unique // Used for STUDENTS and CRs
+  phone     String?  @unique // Used for TEACHERS and ADMINS
+  password  String
+  name      String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attendances       Attendance[]
+  counselingSlots   CounselingSlot[]    @relation("TeacherSlots")
+  counselingReqs    CounselingRequest[] @relation("StudentRequests")
+  feedbacksSubmited Feedback[]          @relation("StudentFeedback")
+  feedbacksReceived Feedback[]          @relation("TeacherFeedback")
+  scheduleSlots     ScheduleSlot[]      @relation("TeacherSchedule")
+  bookedSlots       ScheduleSlot[]      @relation("BookedSchedule")
+  examsCreated      Exam[]              @relation("ExamCreator")
+  courses           Course[]            @relation("TeacherCourses")
+}
+
+model Feedback {
+  id          String   @id @default(uuid())
+  rating      Int      // 1 to 5
+  comment     String?
+  isAnonymous Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  studentId   String
+  teacherId   String
+
+  student     User     @relation("StudentFeedback", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher     User     @relation("TeacherFeedback", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([studentId])
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g., CS101
+  name        String
+  description String?
+  credit      Float?
+  marks       Int?
+  type        String?  // 'Major' | 'Non-Major'
+  year        Int?
+  semester    Int?
+
+  sessions    AttendanceSession[]
+  exams       Exam[]
+  teachers    User[]   @relation("TeacherCourses")
+}
+
+model AttendanceSession {
+  id        String   @id @default(uuid())
+  courseId  String
+  date      DateTime
+  
+  code      String?
+  isActive  Boolean  @default(false)
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  records   Attendance[]
+
+  @@unique([courseId, date])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  sessionId   String
+  studentId   String
+  status      AttendanceStatus @default(ABSENT)
+  
+  session     AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student     User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Prevent duplicate attendance records for the same student in the same session
+  @@unique([sessionId, studentId])
+}
+
+model CounselingSlot {
+  id          String             @id @default(uuid())
+  teacherId   String
+  startTime   DateTime
+  endTime     DateTime
+  
+  teacher     User               @relation("TeacherSlots", fields: [teacherId], references: [id], onDelete: Cascade)
+  requests    CounselingRequest[]
+
+  @@index([teacherId, startTime])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CounselingRequest {
+  id          String         @id @default(uuid())
+  slotId      String
+  studentId   String
+  purpose     String
+  status      RequestStatus  @default(PENDING)
+  createdAt   DateTime       @default(now())
+
+  slot        CounselingSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  student     User           @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([slotId])
+  @@index([studentId])
+}
+
+enum ScheduleSlotStatus {
+  AVAILABLE
+  BOOKED
+}
+
+model ScheduleSlot {
+  id         String             @id @default(uuid())
+  teacherId  String             
+  startTime  DateTime
+  endTime    DateTime
+  status     ScheduleSlotStatus @default(AVAILABLE)
+  bookedById String?            // The CR who booked this slot
+  title      String?            // Event/Class title once booked
+
+  teacher    User               @relation("TeacherSchedule", fields: [teacherId], references: [id], onDelete: Cascade)
+  bookedBy   User?              @relation("BookedSchedule", fields: [bookedById], references: [id], onDelete: SetNull)
+
+  @@index([teacherId, startTime])
+}
+
+model Exam {
+  id          String   @id @default(uuid())
+  title       String
+  courseId    String
+  date        DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("ExamCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([courseId, date])
+}
