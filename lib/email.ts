@@ -29,7 +29,7 @@ export async function sendApprovalEmail(
                 <p style="margin: 5px 0;"><strong>Password:</strong> <span style="font-family: monospace; background: #eee; padding: 2px 5px; border-radius: 4px;">${plainTextPassword}</span></p>
             </div>
             
-            <p>Please log in at: <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/login" style="color: #22c55e;">${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/login</a></p>
+            <p>Please log in at: <a href="${process.env.NEXTAUTH_URL || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 'http://localhost:3000')}/login" style="color: #22c55e;">${process.env.NEXTAUTH_URL || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 'http://localhost:3000')}/login</a></p>
             
             <p style="font-size: 0.9em; color: #666;">For security reasons, we highly recommend changing your password after your first login.</p>
             
