@@ -1,38 +1,38 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { cookies } from 'next/headers';
 
 // GET: Fetch available slots (Student View) or created slots & requests (Teacher View)
 export async function GET(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        const payload = token ? await decrypt(token) : null;
+                const payload = await getServerSession(authOptions);
         if (!payload) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
         const url = new URL(req.url);
         const view = url.searchParams.get('view');
 
         // If Student or CR requesting all available slots
-        if (payload.role === 'STUDENT' || payload.role === 'CR' || view === 'available') {
+        if (payload?.user?.role === 'STUDENT' || payload?.user?.role === 'CR' || view === 'available') {
             const slots = await prisma.counselingSlot.findMany({
                 where: {
-                    // Only fetch slots that don't have an APPROVED request
-                    requests: {
-                        none: { status: 'APPROVED' }
-                    },
                     startTime: { gte: new Date() } // Future slots only
                 },
-                include: { teacher: { select: { id: true, name: true } } },
+                include: { 
+                    teacher: { select: { id: true, name: true } },
+                    requests: { select: { status: true, studentId: true } }
+                },
                 orderBy: { startTime: 'asc' }
             });
-            return NextResponse.json({ slots }, { status: 200 });
+            // Attach current user's userId so the client can identify their own booking
+            return NextResponse.json({ slots, currentUserId: payload?.user?.id }, { status: 200 });
         }
 
         // If Teacher requesting their own slots and pending requests
-        if (payload.role === 'TEACHER') {
+        if (payload?.user?.role === 'TEACHER') {
             const slots = await prisma.counselingSlot.findMany({
-                where: { teacherId: payload.userId },
+                where: { teacherId: payload?.user?.id },
                 include: {
                     requests: {
                         include: { student: { select: { id: true, name: true, email: true } } },
@@ -53,20 +53,19 @@ export async function GET(req: Request) {
 // POST: Create a Slot (Teacher) or Request a Slot (Student)
 export async function POST(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        const payload = token ? await decrypt(token) : null;
+                const payload = await getServerSession(authOptions);
         if (!payload) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
 
         // TEACHER: Creates a new available time slot
-        if (payload.role === 'TEACHER') {
+        if (payload?.user?.role === 'TEACHER') {
             const { startTime, endTime } = body;
             if (!startTime || !endTime) return NextResponse.json({ message: 'Missing times' }, { status: 400 });
 
             const slot = await prisma.counselingSlot.create({
                 data: {
-                    teacherId: payload.userId,
+                    teacherId: payload?.user?.id,
                     startTime: new Date(startTime),
                     endTime: new Date(endTime)
                 }
@@ -75,12 +74,12 @@ export async function POST(req: Request) {
         }
 
         // STUDENT or CR: Requests an existing slot (CR can book on behalf of a student)
-        if (payload.role === 'STUDENT' || payload.role === 'CR') {
+        if (payload?.user?.role === 'STUDENT' || payload?.user?.role === 'CR') {
             const { slotId, purpose, studentId } = body;
             if (!slotId || !purpose) return NextResponse.json({ message: 'Missing fields' }, { status: 400 });
 
             // CR can book on behalf of another student; students book for themselves
-            const bookerStudentId = (payload.role === 'CR' && studentId) ? studentId : payload.userId;
+            const bookerStudentId = (payload?.user?.role === 'CR' && studentId) ? studentId : payload?.user?.id;
 
             // Ensure slot isn't already approved for someone else
             const existingApproved = await prisma.counselingRequest.findFirst({
@@ -110,9 +109,8 @@ export async function POST(req: Request) {
 // PATCH: Approve or Reject a Student's Request (Teacher)
 export async function PATCH(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        const payload = token ? await decrypt(token) : null;
-        if (!payload || payload.role !== 'TEACHER') {
+                const payload = await getServerSession(authOptions);
+        if (!payload || payload?.user?.role !== 'TEACHER') {
             return NextResponse.json({ message: 'Forbidden. Only teachers can manage requests.' }, { status: 403 });
         }
 
@@ -129,7 +127,7 @@ export async function PATCH(req: Request) {
             });
 
             if (!request) throw new Error('Request not found');
-            if (request.slot.teacherId !== payload.userId) throw new Error('Unauthorized for this slot');
+            if (request.slot.teacherId !== payload?.user?.id) throw new Error('Unauthorized for this slot');
 
             // Find if slot is already approved to someone else
             if (status === 'APPROVED') {

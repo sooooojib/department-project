@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 function generateRandomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -14,10 +15,8 @@ function generateRandomCode() {
 export async function GET(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
-        if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+                const session = await getServerSession(authOptions);
+        if (!session || (session?.user?.role !== 'TEACHER' && session?.user?.role !== 'ADMIN')) {
             return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
 
@@ -56,10 +55,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
-        if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+                const session = await getServerSession(authOptions);
+        if (!session || (session?.user?.role !== 'TEACHER' && session?.user?.role !== 'ADMIN')) {
             return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
 

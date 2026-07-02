@@ -26,6 +26,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Semester fields
+  year              Int?
+  semester          Int?
+  requestedYear     Int?
+  requestedSemester Int?
+  semesterStatus    String?
+
   // Relations
   attendances       Attendance[]
   counselingSlots   CounselingSlot[]    @relation("TeacherSlots")
@@ -39,11 +46,16 @@ model User {
 }
 
 model Feedback {
-  id          String   @id @default(uuid())
-  rating      Int      // 1 to 5
-  comment     String?
-  isAnonymous Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id                  String   @id @default(uuid())
+  rating              Int      // 1 to 5
+  comment             String?
+  attachmentUrl       String?  // Student's uploaded file
+  isAnonymous         Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  reply               String?  // Teacher's reply message
+  replyAttachmentUrl  String?  // Path to uploaded file (PDF, image, etc.)
+  repliedAt           DateTime?
 
   studentId   String
   teacherId   String
@@ -168,4 +180,14 @@ model Exam {
   createdBy   User     @relation("ExamCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([courseId, date])
+}
+
+model SignupRequest {
+  id         String        @id @default(uuid())
+  name       String
+  email      String        @unique
+  role       Role
+  identifier String        // Student ID, phone, etc.
+  status     RequestStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
 }

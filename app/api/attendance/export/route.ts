@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 export async function GET(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
         if (!token) return new NextResponse('Unauthorized', { status: 401 });
 
-        const session = await decrypt(token);
-        if (!session || session.role === 'STUDENT') {
+        const session = await getServerSession(authOptions);
+        if (!session || session?.user?.role === 'STUDENT') {
             return new NextResponse('Forbidden', { status: 403 });
         }
 

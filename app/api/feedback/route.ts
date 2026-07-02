@@ -13,10 +13,33 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Only students and CRs can submit feedback' }, { status: 403 });
         }
 
-        const { teacherId, rating, comment, isAnonymous } = await req.json();
+        const { teacherId, rating, comment, isAnonymous, attachmentUrl } = await req.json();
 
         if (!teacherId || !rating || rating < 1 || rating > 5) {
             return NextResponse.json({ message: 'Valid teacher ID and rating (1-5) are required' }, { status: 400 });
+        }
+
+        // Verify the student has attended at least one class taught by this teacher
+        const hasAttendedClass = await prisma.attendance.findFirst({
+            where: {
+                studentId: payload.userId,
+                status: 'PRESENT',
+                session: {
+                    course: {
+                        teachers: {
+                            some: {
+                                id: teacherId
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!hasAttendedClass) {
+            return NextResponse.json({ 
+                message: 'You can only submit feedback for teachers if you have been present in at least one of their classes.' 
+            }, { status: 403 });
         }
 
         const feedback = await prisma.feedback.create({
@@ -25,6 +48,7 @@ export async function POST(req: Request) {
                 teacherId,
                 rating,
                 comment,
+                attachmentUrl,
                 isAnonymous: Boolean(isAnonymous),
             },
         });
@@ -94,3 +118,68 @@ export async function GET(req: Request) {
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
     }
 }
+
+export async function PATCH(req: Request) {
+    try {
+        const token = (await cookies()).get('token')?.value;
+        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+        const payload = await decrypt(token);
+        if (!payload) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await req.json();
+        const { feedbackId } = body;
+
+        if (!feedbackId) {
+            return NextResponse.json({ message: 'Feedback ID is required' }, { status: 400 });
+        }
+
+        const existing = await prisma.feedback.findUnique({ where: { id: feedbackId } });
+        if (!existing) {
+            return NextResponse.json({ message: 'Feedback not found' }, { status: 404 });
+        }
+
+        let updatedFeedback;
+
+        if (payload.role === 'TEACHER') {
+            if (existing.teacherId !== payload.userId) {
+                return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
+            }
+            
+            const { reply, replyAttachmentUrl } = body;
+            updatedFeedback = await prisma.feedback.update({
+                where: { id: feedbackId },
+                data: {
+                    reply,
+                    replyAttachmentUrl: replyAttachmentUrl !== undefined ? replyAttachmentUrl : existing.replyAttachmentUrl,
+                    repliedAt: new Date(),
+                },
+            });
+        } else if (payload.role === 'STUDENT' || payload.role === 'CR') {
+            if (existing.studentId !== payload.userId) {
+                return NextResponse.json({ message: 'Unauthorized' }, { status: 403 });
+            }
+            
+            const { rating, comment, isAnonymous, attachmentUrl } = body;
+            updatedFeedback = await prisma.feedback.update({
+                where: { id: feedbackId },
+                data: {
+                    rating: rating || existing.rating,
+                    comment: comment !== undefined ? comment : existing.comment,
+                    isAnonymous: isAnonymous !== undefined ? Boolean(isAnonymous) : existing.isAnonymous,
+                    attachmentUrl: attachmentUrl !== undefined ? attachmentUrl : existing.attachmentUrl,
+                },
+            });
+        } else {
+            return NextResponse.json({ message: 'Unauthorized role for editing' }, { status: 403 });
+        }
+
+        return NextResponse.json({ message: 'Feedback updated successfully', feedback: updatedFeedback }, { status: 200 });
+    } catch (error) {
+        console.error('Feedback PATCH error:', error);
+        return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    }
+}
+

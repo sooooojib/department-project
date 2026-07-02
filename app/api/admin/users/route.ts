@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { cookies } from 'next/headers';
 import { hash } from 'bcryptjs';
 
 export async function GET(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const payload = await decrypt(token);
-        if (!payload || payload.role !== 'ADMIN') {
+                        const payload = await getServerSession(authOptions);
+        if (!payload || payload?.user?.role !== 'ADMIN') {
             return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
 
@@ -53,11 +51,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const payload = await decrypt(token);
-        if (!payload || payload.role !== 'ADMIN') {
+                        const payload = await getServerSession(authOptions);
+        if (!payload || payload?.user?.role !== 'ADMIN') {
             return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
 

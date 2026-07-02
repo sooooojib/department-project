@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN' | 'CR' | null }) {
     const pathname = usePathname();
@@ -14,9 +15,7 @@ export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            router.push('/login');
-            router.refresh();
+            await signOut({ callbackUrl: '/login' });
         } catch (error) {
             console.error('Logout failed:', error);
         }

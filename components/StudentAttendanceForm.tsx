@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function StudentAttendanceForm({ courses }: { courses: { id: string, code: string, name: string }[] }) {
+export default function StudentAttendanceForm({ courses, isAssigned = true }: { courses: { id: string, code: string, name: string }[], isAssigned?: boolean }) {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [courseId, setCourseId] = useState(courses[0]?.id || '');
     const [code, setCode] = useState('');
@@ -42,8 +42,6 @@ export default function StudentAttendanceForm({ courses }: { courses: { id: stri
         }
     };
 
-    if (courses.length === 0) return null;
-
     return (
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-zinc-200">
             <h2 className="text-xl font-bold text-zinc-900 mb-6">Submit Live Attendance</h2>
@@ -55,9 +53,9 @@ export default function StudentAttendanceForm({ courses }: { courses: { id: stri
                     <input
                         type="date"
                         required
+                        readOnly
                         value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        className="w-full h-11 px-4 border border-zinc-300 rounded-lg bg-zinc-50 text-zinc-500 cursor-not-allowed focus:outline-none"
                     />
                 </div>
                 
@@ -65,13 +63,20 @@ export default function StudentAttendanceForm({ courses }: { courses: { id: stri
                     <label className="block text-sm font-medium text-zinc-700 mb-1">Course</label>
                     <select
                         required
+                        disabled={!isAssigned || courses.length === 0}
                         value={courseId}
                         onChange={(e) => setCourseId(e.target.value)}
-                        className="w-full px-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        className="w-full h-11 px-4 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 disabled:bg-zinc-50"
                     >
-                        {courses.map(c => (
-                            <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                        ))}
+                        {!isAssigned ? (
+                            <option value="">Not assigned to any semester</option>
+                        ) : courses.length === 0 ? (
+                            <option value="">No courses available</option>
+                        ) : (
+                            courses.map(c => (
+                                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                            ))
+                        )}
                     </select>
                 </div>
 
@@ -80,10 +85,11 @@ export default function StudentAttendanceForm({ courses }: { courses: { id: stri
                     <input
                         type="text"
                         required
+                        disabled={!isAssigned || courses.length === 0}
                         placeholder="e.g. A7B9X2"
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
-                        className="w-full px-4 py-2 border border-zinc-300 rounded-lg font-mono text-center tracking-widest uppercase focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        className="w-full h-11 px-4 border border-zinc-300 rounded-lg font-mono text-center tracking-widest uppercase focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-60 disabled:bg-zinc-50"
                     />
                     </div>
                 </div>
@@ -91,9 +97,9 @@ export default function StudentAttendanceForm({ courses }: { courses: { id: stri
                 <div className="flex justify-end">
                     <button
                         type="submit"
-                        disabled={loading || !code}
+                        disabled={loading || !code || !isAssigned || courses.length === 0}
                         className={`w-full sm:w-auto px-8 py-2.5 font-medium rounded-lg text-white transition-colors ${
-                            loading || !code ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+                            loading || !code || !isAssigned || courses.length === 0 ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
                         }`}
                     >
                         {loading ? 'Submitting...' : 'Submit Code'}

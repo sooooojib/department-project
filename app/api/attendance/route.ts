@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 export async function GET(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
+                const session = await getServerSession(authOptions);
         if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
         // Parse search params for specific course if needed
         const url = new URL(req.url);
         const courseId = url.searchParams.get('courseId');
 
-        if (session.role === 'STUDENT') {
+        if (session?.user?.role === 'STUDENT' || session?.user?.role === 'CR') {
             // Students only see their own attendance
             const attendances = await prisma.attendance.findMany({
                 where: {
-                    studentId: session.userId,
+                    studentId: session?.user?.id,
                     ...(courseId && { session: { courseId } }),
                 },
                 include: {
@@ -64,10 +63,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
-        if (!session || (session.role !== 'TEACHER' && session.role !== 'ADMIN')) {
+                const session = await getServerSession(authOptions);
+        if (!session || (session?.user?.role !== 'TEACHER' && session?.user?.role !== 'ADMIN')) {
             return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
 
@@ -115,6 +112,35 @@ export async function POST(req: Request) {
         );
 
         await Promise.all(upsertPromises);
+
+        // Record this as a taught class for dashboard tally
+        // We create a ScheduleSlot entry (BOOKED) for this teacher/course/date
+        const slotStart = new Date(date);
+        slotStart.setHours(8, 0, 0, 0);
+        const slotEnd = new Date(date);
+        slotEnd.setHours(9, 0, 0, 0);
+
+        // Find existing slot for this teacher+course+date to avoid duplicates
+        const existingSlot = await prisma.scheduleSlot.findFirst({
+            where: {
+                teacherId: session?.user?.id,
+                title: { contains: courseId },
+                startTime: { gte: new Date(new Date(date).setHours(0,0,0,0)), lt: new Date(new Date(date).setHours(23,59,59,999)) }
+            }
+        });
+
+        if (!existingSlot) {
+            await prisma.scheduleSlot.create({
+                data: {
+                    teacherId: session?.user?.id,
+                    startTime: slotStart,
+                    endTime: slotEnd,
+                    status: 'BOOKED',
+                    title: `Attendance:${courseId}`,
+                    bookedById: session?.user?.id,
+                }
+            });
+        }
 
         return NextResponse.json({ message: 'Attendance marked successfully' }, { status: 200 });
 

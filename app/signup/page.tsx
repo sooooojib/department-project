@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { CreditCard, User, IdCard, Lock, ChevronDown } from 'lucide-react';
 
 const inputBase: React.CSSProperties = {
@@ -20,9 +21,10 @@ export default function SignupPage() {
     const router = useRouter();
     const [name, setName] = useState('');
     const [identifier, setIdentifier] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('');
     const [role, setRole] = useState('STUDENT');
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -30,8 +32,15 @@ export default function SignupPage() {
         setError('');
         setLoading(true);
 
-        if (!identifier || !password || !name) {
+        if (!identifier || !email || !name) {
             setError('All fields are required');
+            setLoading(false);
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Please enter a valid email address.');
             setLoading(false);
             return;
         }
@@ -40,7 +49,7 @@ export default function SignupPage() {
             const res = await fetch('/api/auth/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ identifier, password, name, role }),
+                body: JSON.stringify({ identifier, email, name, role }),
             });
 
             const data = await res.json();
@@ -51,14 +60,14 @@ export default function SignupPage() {
                 return;
             }
 
-            router.push('/dashboard');
-            router.refresh();
+            setSuccessMessage('Your request has been sent to the admin for approval. You will receive an email with your credentials once approved.');
+            setIdentifier('');
+            setEmail('');
+            setName('');
         } catch (err) {
             setError('An unexpected error occurred. Please try again.');
         } finally {
-            if (!router) {
-                setLoading(false);
-            }
+            setLoading(false);
         }
     };
 
@@ -110,6 +119,12 @@ export default function SignupPage() {
                                     {error}
                                 </div>
                             )}
+                            
+                            {successMessage && (
+                                <div className="px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-medium text-center">
+                                    {successMessage}
+                                </div>
+                            )}
 
                             {/* Account Type */}
                             <div className="space-y-1 w-full">
@@ -150,12 +165,12 @@ export default function SignupPage() {
                             {/* Student ID / Phone */}
                             <div className="space-y-1 w-full">
                                 <label className="block text-xs font-semibold text-gray-500 ml-3">
-                                    {role === 'STUDENT' || role === 'CR' ? 'Student ID' : 'Phone / Email'}
+                                    {role === 'STUDENT' || role === 'CR' ? 'Student ID' : 'Phone Number (WhatsApp)'}
                                 </label>
                                 <div className="relative flex items-center w-full">
                                     <input
                                         id="identifier" name="identifier" type="text" required
-                                        placeholder={role === 'STUDENT' || role === 'CR' ? 'Enter Student ID' : 'Enter Phone or Email'}
+                                        placeholder={role === 'STUDENT' || role === 'CR' ? 'Enter Student ID' : 'Enter WhatsApp number'}
                                         value={identifier}
                                         onChange={(e) => setIdentifier(e.target.value)}
                                         disabled={loading}
@@ -165,17 +180,17 @@ export default function SignupPage() {
                                 </div>
                             </div>
 
-                            {/* Password */}
+                            {/* Email */}
                             <div className="space-y-1 w-full">
-                                <label className="block text-xs font-semibold text-gray-500 ml-3">Password</label>
+                                <label className="block text-xs font-semibold text-gray-500 ml-3">Email Address</label>
                                 <div className="relative flex items-center w-full">
                                     <input
-                                        id="password" name="password" type="password" required
-                                        placeholder="•••••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
+                                        id="email" name="email" type="email" required
+                                        placeholder="Enter your email address"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         disabled={loading}
-                                        className="w-full px-5 rounded-full text-sm text-gray-900 placeholder-gray-400 tracking-widest outline-none transition-all duration-200 border border-white focus:border-gray-400"
+                                        className="w-full px-5 rounded-full text-sm text-gray-900 placeholder-gray-400 outline-none transition-all duration-200 border border-white focus:border-gray-400"
                                         style={{ height: '48px', backgroundColor: 'rgba(255, 255, 255, 0.7)' }}
                                     />
                                 </div>
@@ -216,14 +231,14 @@ export default function SignupPage() {
                 >
                     {/* Desk Illustration centered inside */}
                     <img
-                        src="/desk_illustration.png"
+                        src="/new_desk_illustration.png"
                         alt="Desk Setup Illustration"
                         className="w-[85%] h-auto object-contain z-10 mix-blend-multiply"
                     />
 
                     {/* Tagline overlay underneath illustration */}
                     <p className="mt-8 mb-4 text-gray-500 text-sm xl:text-base text-center leading-relaxed max-w-[260px] z-10 font-medium">
-                        Join thousands of students managing their academics globally.
+                        Let's start your academic journey
                     </p>
                 </div>
             </div>

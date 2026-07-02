@@ -1,32 +1,68 @@
 import DashboardCard from '@/components/DashboardCard';
-import { cookies } from 'next/headers';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import prisma from '@/lib/prisma';
-import { format } from 'date-fns';
+import { format, startOfToday, endOfToday, startOfTomorrow, endOfTomorrow } from 'date-fns';
+import TeacherClassesExamsWidget from '@/components/TeacherClassesExamsWidget';
 
 export default async function TeacherDashboard() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    const payload = token ? await decrypt(token) : null;
+    const payload = await getServerSession(authOptions);
 
     let classes: any[] = [];
+    let assignedCourses: any[] = [];
+    let exams: any[] = [];
     let pendingReqs = 0;
+    let classLabel = "Today's Classes";
 
-    if (payload?.userId) {
+    if (payload?.user?.id) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        let targetDateStart, targetDateEnd;
+        if (currentHour >= 5 && currentHour < 17) {
+            targetDateStart = startOfToday();
+            targetDateEnd = endOfToday();
+            classLabel = "Today's Classes";
+        } else {
+            targetDateStart = startOfTomorrow();
+            targetDateEnd = endOfTomorrow();
+            classLabel = "Tomorrow's Classes";
+        }
+
         classes = await prisma.scheduleSlot.findMany({
             where: {
-                teacherId: payload.userId,
+                teacherId: payload?.user?.id,
                 status: 'BOOKED',
+                startTime: { gte: targetDateStart, lte: targetDateEnd },
+                NOT: { title: { startsWith: 'Attendance:' } }
             },
-            orderBy: { startTime: 'asc' },
-            take: 6
+            orderBy: { startTime: 'asc' }
+        });
+
+        exams = await prisma.exam.findMany({
+            where: {
+                course: {
+                    teachers: { some: { id: payload?.user?.id } }
+                },
+                date: { gte: startOfToday() }
+            },
+            include: { course: { select: { code: true, name: true } } },
+            orderBy: { date: 'asc' },
+            take: 10
         });
 
         pendingReqs = await prisma.counselingRequest.count({
             where: {
-                slot: { teacherId: payload.userId },
+                slot: { teacherId: payload?.user?.id },
                 status: 'PENDING'
             }
+        });
+
+        assignedCourses = await prisma.course.findMany({
+            where: {
+                teachers: { some: { id: payload?.user?.id } }
+            },
+            orderBy: { code: 'asc' }
         });
     }
 
@@ -37,6 +73,22 @@ export default async function TeacherDashboard() {
         const room = (hash % 400) + 101;
         return `${building} - Room ${room}`;
     };
+
+    const serialisedClasses = classes.map(c => ({
+        id: c.id,
+        title: c.title,
+        startTime: c.startTime.toISOString(),
+        endTime: c.endTime.toISOString(),
+        room: getRoomNumber(c.id),
+    }));
+
+    const serialisedExams = exams.map(e => ({
+        id: e.id,
+        title: e.title,
+        date: e.date.toISOString(),
+        room: getRoomNumber(e.id),
+        course: { code: e.course.code, name: e.course.name },
+    }));
 
     return (
         <div className="p-8 max-w-[1600px] mx-auto space-y-6">
@@ -70,46 +122,47 @@ export default async function TeacherDashboard() {
                 />
             </div>
 
-            <div className="pt-2">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden min-h-[400px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2 pb-8 items-start">
+                <TeacherClassesExamsWidget 
+                    classes={serialisedClasses} 
+                    exams={serialisedExams} 
+                    classLabel={classLabel} 
+                />
+
+                {/* Courses Assigned - ~33% width */}
+                <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
                     <div className="flex justify-between items-center mb-6 px-1">
-                        <h2 className="text-lg font-bold text-slate-800">My Class Schedule</h2>
-                        <a href="/schedule" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">View full calendar &rarr;</a>
+                        <h2 className="text-lg font-bold text-slate-800">Courses Assigned</h2>
                     </div>
 
-                    {classes.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                    {assignedCourses.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-48 text-slate-400">
                             <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                             </svg>
-                            <p className="font-medium">No classes scheduled yet.</p>
+                            <p className="font-medium">No courses assigned yet.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {classes.map((slot) => (
-                                <div key={slot.id} className="group relative flex flex-col p-5 border border-slate-100 bg-slate-50 hover:bg-white hover:border-emerald-200 hover:shadow-md transition-all rounded-xl">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex items-center space-x-2 bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                            <span>Scheduled</span>
+                        <div className="grid grid-cols-1 gap-4">
+                            {assignedCourses.map((course) => (
+                                <div key={course.id} className="group relative flex flex-col p-5 border border-slate-100 border-t-4 border-t-emerald-500 bg-slate-50 hover:bg-white hover:border-x-emerald-200 hover:border-b-emerald-200 hover:shadow-md transition-all rounded-xl">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{course.code}</h3>
+                                    <p className="text-sm font-medium text-slate-500 mb-3">{course.name}</p>
+                                    
+                                    <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-400 uppercase text-[10px] tracking-wider mb-0.5 font-bold">Credit</span>
+                                            <span className="text-sm font-bold text-black">{course.credit?.toFixed(1) || 'N/A'}</span>
                                         </div>
-                                        <p className="text-xs font-bold text-slate-400">{format(new Date(slot.startTime), 'MMM d, yyyy')}</p>
-                                    </div>
-
-                                    <h3 className="text-lg font-bold text-slate-800 mb-1 leading-snug">{slot.title || 'Untitled Class Session'}</h3>
-
-                                    <div className="mt-auto pt-4 space-y-2">
-                                        <div className="flex items-center text-sm font-medium text-slate-500">
-                                            <svg className="w-4 h-4 mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            {format(new Date(slot.startTime), 'h:mm a')} - {format(new Date(slot.endTime), 'h:mm a')}
+                                        
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-400 uppercase text-[10px] tracking-wider mb-0.5 font-bold">Type</span>
+                                            <span className="text-sm font-bold text-black">{course.type || 'N/A'}</span>
                                         </div>
-                                        <div className="flex items-center text-sm font-medium text-slate-500">
-                                            <svg className="w-4 h-4 mr-2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m3-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                            </svg>
-                                            {getRoomNumber(slot.id)}
+                                        
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-400 uppercase text-[10px] tracking-wider mb-0.5 font-bold">Semester</span>
+                                            <span className="text-sm font-bold text-black">Y{course.year} S{course.semester}</span>
                                         </div>
                                     </div>
                                 </div>

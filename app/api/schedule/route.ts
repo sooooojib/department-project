@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 export async function GET(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
+                const session = await getServerSession(authOptions);
         if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
         const url = new URL(req.url);
@@ -27,7 +26,7 @@ export async function GET(req: Request) {
         // For simplicity and a shared calendar view, we'll return all slots, 
         // but let the frontend filter, or we could filter here.
         // If we want a strict "teacher only sees theirs" view:
-        // if (session.role === 'TEACHER') { whereClause.teacherId = session.userId; }
+        // if (session?.user?.role === 'TEACHER') { whereClause.teacherId = session?.user?.id; }
 
         const slots = await prisma.scheduleSlot.findMany({
             where: whereClause,
@@ -48,11 +47,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
+                const session = await getServerSession(authOptions);
         // Only Teachers can OPEN slots
-        if (!session || session.role !== 'TEACHER') {
+        if (!session || session?.user?.role !== 'TEACHER') {
             return NextResponse.json({ message: 'Forbidden: Only teachers can set availability' }, { status: 403 });
         }
 
@@ -69,7 +66,7 @@ export async function POST(req: Request) {
         // Overlap math: ExistingStart < NewEnd AND ExistingEnd > NewStart
         const overlappingSlots = await prisma.scheduleSlot.findMany({
             where: {
-                teacherId: session.userId,
+                teacherId: session?.user?.id,
                 startTime: { lt: end },
                 endTime: { gt: start }
             }
@@ -81,7 +78,7 @@ export async function POST(req: Request) {
 
         const newSlot = await prisma.scheduleSlot.create({
             data: {
-                teacherId: session.userId,
+                teacherId: session?.user?.id,
                 startTime: start,
                 endTime: end,
                 status: 'AVAILABLE'
@@ -98,11 +95,9 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
+                const session = await getServerSession(authOptions);
         // Only CRs and Admins can BOOK slots
-        if (!session || (session.role !== 'CR' && session.role !== 'ADMIN')) {
+        if (!session || (session?.user?.role !== 'CR' && session?.user?.role !== 'ADMIN')) {
             return NextResponse.json({ message: 'Forbidden: Only CRs can book slots' }, { status: 403 });
         }
 
@@ -125,7 +120,7 @@ export async function PUT(req: Request) {
             },
             data: {
                 status: 'BOOKED',
-                bookedById: session.userId,
+                bookedById: session?.user?.id,
                 title: title
             }
         });

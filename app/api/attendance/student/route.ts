@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 
 export async function POST(req: Request) {
     try {
         const token = req.headers.get('cookie')?.split('token=')[1]?.split(';')[0];
-        if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-        const session = await decrypt(token);
-        if (!session || session.role !== 'STUDENT') {
-            return NextResponse.json({ message: 'Forbidden: Students only' }, { status: 403 });
+                const session = await getServerSession(authOptions);
+        if (!session || (session?.user?.role !== 'STUDENT' && session?.user?.role !== 'CR')) {
+            return NextResponse.json({ message: 'Forbidden: Students and CRs only' }, { status: 403 });
         }
 
         const { courseId, date, code } = await req.json();
@@ -44,7 +43,7 @@ export async function POST(req: Request) {
             where: {
                 sessionId_studentId: {
                     sessionId: attendanceSession.id,
-                    studentId: session.userId
+                    studentId: session?.user?.id
                 }
             },
             update: {
@@ -52,7 +51,7 @@ export async function POST(req: Request) {
             },
             create: {
                 sessionId: attendanceSession.id,
-                studentId: session.userId,
+                studentId: session?.user?.id,
                 status: 'PRESENT'
             }
         });

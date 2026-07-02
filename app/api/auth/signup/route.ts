@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
-import { hash } from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import { encrypt } from '@/lib/auth';
 
 export async function POST(req: Request) {
     try {
-        const { identifier, password, name, role } = await req.json();
+        let { identifier, email, name, role } = await req.json();
 
-        if (!identifier || !password || !name) {
+        if (!identifier || !email || !name) {
             return NextResponse.json(
                 { message: 'Missing required fields' },
+                { status: 400 }
+            );
+        }
+
+        // Make student IDs all caps
+        if (role === 'STUDENT' || role === 'CR') {
+            identifier = identifier.toUpperCase();
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return NextResponse.json(
+                { message: 'Invalid email address format' },
                 { status: 400 }
             );
         }
@@ -29,7 +40,7 @@ export async function POST(req: Request) {
         const existingUser = await prisma.user.findFirst({
             where: {
                 OR: [
-                    { email: identifier },
+                    { email: email },
                     { studentId: identifier },
                     { phone: identifier },
                 ]
@@ -38,61 +49,44 @@ export async function POST(req: Request) {
 
         if (existingUser) {
             return NextResponse.json(
-                { message: 'User with this identifier already exists' },
+                { message: 'User with this email or identifier already exists' },
                 { status: 409 }
             );
         }
 
-        // Hash password
-        const hashedPassword = await hash(password, 10);
+        // Check if a signup request already exists for this email
+        const existingRequest = await prisma.signupRequest.findFirst({
+            where: { email: email }
+        });
 
-        // Determine which field to put the identifier in
-        let createData: any = {
-            name,
-            password: hashedPassword,
-            role: userRole,
-        };
-
-        if (userRole === 'STUDENT' || userRole === 'CR') {
-            createData.studentId = identifier;
-            // Optionally, we could accept an explicit email separately, but for now we'll rely on the identifier payload
-            if (identifier.includes('@')) {
-                createData.email = identifier;
-            }
-        } else {
-            // TEACHER or ADMIN
-            if (identifier.includes('@')) {
-                createData.email = identifier;
+        if (existingRequest) {
+            if (existingRequest.status === 'PENDING') {
+                return NextResponse.json(
+                    { message: 'A pending request with this email already exists' },
+                    { status: 409 }
+                );
             } else {
-                createData.phone = identifier;
+                // If there's an old REJECTED or APPROVED request, delete it so they can submit a new one
+                await prisma.signupRequest.delete({
+                    where: { id: existingRequest.id }
+                });
             }
         }
 
-        const newUser = await prisma.user.create({
-            data: createData,
+        // Create the pending SignupRequest
+        const newRequest = await prisma.signupRequest.create({
+            data: {
+                name,
+                email,
+                role: userRole as any,
+                identifier,
+            },
         });
 
-        // Generate JWT
-        const token = await encrypt({
-            userId: newUser.id,
-            role: newUser.role as any,
-        });
-
-        // Create response with cookie
-        const response = NextResponse.json(
-            { message: 'Signup successful', user: { id: newUser.id, identifier, name, role: newUser.role } },
+        return NextResponse.json(
+            { message: 'Signup request submitted for admin approval', requestId: newRequest.id },
             { status: 201 }
         );
-
-        response.cookies.set('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 60 * 60 * 24 * 7, // 1 week
-        });
-
-        return response;
     } catch (error) {
         console.error('Signup error:', error);
         return NextResponse.json(

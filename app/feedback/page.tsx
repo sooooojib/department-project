@@ -19,29 +19,27 @@ export default function FeedbackPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [filterMode, setFilterMode] = useState<'ALL' | 'REPLIED' | 'NOT_REPLIED'>('ALL');
+
+    const fetchFeedbacks = async () => {
+        try {
+            const fbRes = await fetch('/api/feedback');
+            if (fbRes.ok) {
+                const data = await fbRes.json();
+                setFeedbacks(data.feedbacks);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                // We need to fetch the logged-in user's role and data. 
-                // We'll create a quick proxy to get our session or just fetch feedbacks and infer.
-                // For a robust app, we'd have a /api/auth/me endpoint.
-                // Let's rely on the feedback endpoint logic since it checks roles.
+                await fetchFeedbacks();
 
-                const [fbRes, teacherRes] = await Promise.all([
-                    fetch('/api/feedback'),
-                    fetch('/api/users?role=TEACHER') // We will need to create this simple endpoints
-                ]);
-
-                if (fbRes.ok) {
-                    const data = await fbRes.json();
-                    setFeedbacks(data.feedbacks);
-
-                    // A quick hack to infer role if we don't have a /me endpoint:
-                    // If we see 'student' objects in all feedbacks, we are likely a teacher or admin 
-                    // Let's do a proper check below using headers if possible.
-                }
-
+                const teacherRes = await fetch('/api/users?role=TEACHER');
                 if (teacherRes.ok) {
                     const data = await teacherRes.json();
                     setTeachers(data.users || []);
@@ -54,8 +52,6 @@ export default function FeedbackPage() {
         };
 
         fetchContext();
-        // Read role from cookie/localstorage or wait for a `/me` endpoint
-        // For now, we will add a role-check endpoint to make this fluid.
     }, []);
 
     const fetchRole = async () => {
@@ -77,10 +73,26 @@ export default function FeedbackPage() {
         setSubmitting(true);
 
         try {
+            let attachmentUrl = null;
+
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const uploadRes = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (!uploadRes.ok) throw new Error('Failed to upload file');
+                const uploadData = await uploadRes.json();
+                attachmentUrl = uploadData.url;
+            }
+
             const res = await fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teacherId: selectedTeacher, rating, comment, isAnonymous }),
+                body: JSON.stringify({ teacherId: selectedTeacher, rating, comment, isAnonymous, attachmentUrl }),
             });
 
             const data = await res.json();
@@ -95,16 +107,13 @@ export default function FeedbackPage() {
             setRating(5);
             setComment('');
             setIsAnonymous(false);
+            setFile(null);
 
             // Refresh feedback list
-            const fbRes = await fetch('/api/feedback');
-            if (fbRes.ok) {
-                const updated = await fbRes.json();
-                setFeedbacks(updated.feedbacks);
-            }
+            await fetchFeedbacks();
 
-        } catch (err) {
-            setError('An unexpected error occurred.');
+        } catch (err: any) {
+            setError(err.message || 'An unexpected error occurred.');
         } finally {
             setSubmitting(false);
         }
@@ -170,16 +179,30 @@ export default function FeedbackPage() {
                             />
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <label className="flex items-center space-x-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                                    checked={isAnonymous}
-                                    onChange={e => setIsAnonymous(e.target.checked)}
-                                />
-                                <span className="text-zinc-700 font-medium">Submit Anonymously</span>
-                            </label>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                        checked={isAnonymous}
+                                        onChange={e => setIsAnonymous(e.target.checked)}
+                                    />
+                                    <span className="text-zinc-700 font-medium text-sm">Submit Anonymously</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-zinc-700 hover:text-emerald-700 transition-colors">
+                                    <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    </svg>
+                                    {file ? <span className="text-emerald-600 truncate max-w-[150px]">{file.name}</span> : 'Attach File'}
+                                    <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        onChange={e => setFile(e.target.files?.[0] || null)}
+                                    />
+                                </label>
+                            </div>
 
                             <button
                                 type="submit"
@@ -194,19 +217,52 @@ export default function FeedbackPage() {
             )}
 
             <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-zinc-800 border-b pb-2">
-                    {(role === 'STUDENT' || role === 'CR') ? 'Your Submitted Feedback' : 'Received Feedback'}
-                </h2>
-
-                {feedbacks.length === 0 ? (
-                    <p className="text-zinc-500 italic bg-white p-8 rounded-xl border border-dashed border-zinc-300 text-center">No feedback records found.</p>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {feedbacks.map(fb => (
-                            <FeedbackCard key={fb.id} feedback={fb} viewerRole={role || 'STUDENT'} />
-                        ))}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+                    <h2 className="text-2xl font-bold text-zinc-800">
+                        {(role === 'STUDENT' || role === 'CR') ? 'Your Submitted Feedback' : 'Received Feedback'}
+                    </h2>
+                    
+                    <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setFilterMode('ALL')}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${filterMode === 'ALL' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900'}`}
+                        >
+                            All
+                        </button>
+                        <button 
+                            onClick={() => setFilterMode('REPLIED')}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${filterMode === 'REPLIED' ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-600 hover:text-zinc-900'}`}
+                        >
+                            Replied
+                        </button>
+                        <button 
+                            onClick={() => setFilterMode('NOT_REPLIED')}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${filterMode === 'NOT_REPLIED' ? 'bg-white text-amber-600 shadow-sm' : 'text-zinc-600 hover:text-zinc-900'}`}
+                        >
+                            Not Replied
+                        </button>
                     </div>
-                )}
+                </div>
+
+                {(() => {
+                    const filtered = feedbacks.filter(fb => {
+                        if (filterMode === 'REPLIED') return !!fb.reply || !!fb.replyAttachmentUrl;
+                        if (filterMode === 'NOT_REPLIED') return !fb.reply && !fb.replyAttachmentUrl;
+                        return true;
+                    });
+
+                    if (filtered.length === 0) {
+                        return <p className="text-zinc-500 italic bg-white p-8 rounded-xl border border-dashed border-zinc-300 text-center">No feedback records found for this filter.</p>;
+                    }
+
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {filtered.map(fb => (
+                                <FeedbackCard key={fb.id} feedback={fb} viewerRole={role || 'STUDENT'} onReplySubmitted={fetchFeedbacks} />
+                            ))}
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );

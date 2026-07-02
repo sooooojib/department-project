@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
 import { Users, Shield, GraduationCap, UserCircle, Plus, Trash2, X, BookOpen } from 'lucide-react';
+import PendingSignupsWidget from '@/components/PendingSignupsWidget';
 
 interface UserData {
     id: string;
@@ -201,6 +202,86 @@ export default function AdminDashboard() {
 
     const sortedGroupKeys = Object.keys(groupedCourses).sort();
 
+    const renderUserTable = (title: string, data: UserData[], showCourses: boolean = false) => (
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden mb-8">
+            <div className="p-6 border-b border-zinc-100">
+                <h2 className="text-lg font-semibold text-zinc-900">{title} <span className="ml-2 text-sm text-zinc-500 font-normal bg-zinc-100 px-2 py-0.5 rounded-full">{data.length}</span></h2>
+            </div>
+            {data.length === 0 ? (
+                <div className="p-12 text-center text-zinc-500">No {title.toLowerCase()} found in the system.</div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-zinc-50 text-zinc-500 font-medium border-b border-zinc-100">
+                            <tr>
+                                <th className="px-6 py-4">Name</th>
+                                <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Identifier / Username</th>
+                                {showCourses && <th className="px-6 py-4">Assigned Courses</th>}
+                                <th className="px-6 py-4">Joined Date</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100">
+                            {data.map((user) => (
+                                <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-zinc-900">
+                                        {user.name}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(user.role)}`}>
+                                            {getRoleIcon(user.role)}
+                                            {user.role}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-zinc-600 font-mono text-xs">
+                                        {user.identifier}
+                                    </td>
+                                    {showCourses && (
+                                        <td className="px-6 py-4">
+                                            {user.role === 'TEACHER' ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-zinc-600 font-medium">
+                                                        {user.courses?.length || 0} course{(user.courses?.length !== 1) ? 's' : ''}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => openCourseModal(user)}
+                                                        className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-zinc-100 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-600 rounded border border-zinc-200 transition-colors"
+                                                    >
+                                                        <BookOpen className="w-3 h-3" />
+                                                        Manage
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-zinc-400">—</span>
+                                            )}
+                                        </td>
+                                    )}
+                                    <td className="px-6 py-4 text-zinc-500">
+                                        {new Date(user.createdAt).toLocaleDateString(undefined, {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                        })}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => handleDeleteUser(user.id, user.name)}
+                                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Delete User"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-zinc-50 p-6 md:p-12 font-sans relative">
             <div className="max-w-6xl mx-auto space-y-8">
@@ -228,95 +309,31 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Users Table Section */}
-                <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
-                    <div className="p-6 border-b border-zinc-100">
-                        <h2 className="text-lg font-semibold text-zinc-900">Registered Accounts</h2>
-                    </div>
+                {/* Pending Signups Widget */}
+                <PendingSignupsWidget />
 
-                    {loading ? (
-                        <div className="p-12 text-center text-zinc-500">Loading users...</div>
-                    ) : error ? (
-                        <div className="p-12 text-center space-y-3">
-                            <p className="text-red-500 font-medium text-sm">{error}</p>
-                            <button
-                                onClick={fetchUsers}
-                                className="text-sm px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg transition-colors"
-                            >
-                                Retry
-                            </button>
-                        </div>
-                    ) : users.length === 0 ? (
-                        <div className="p-12 text-center text-zinc-500">No users found in the system.</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-zinc-50 text-zinc-500 font-medium border-b border-zinc-100">
-                                    <tr>
-                                        <th className="px-6 py-4">Name</th>
-                                        <th className="px-6 py-4">Role</th>
-                                        <th className="px-6 py-4">Identifier / Username</th>
-                                        <th className="px-6 py-4">Assigned Courses</th>
-                                        <th className="px-6 py-4">Joined Date</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-100">
-                                    {users.map((user) => (
-                                        <tr key={user.id} className="hover:bg-zinc-50/50 transition-colors">
-                                            <td className="px-6 py-4 font-medium text-zinc-900">
-                                                {user.name}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(user.role)}`}>
-                                                    {getRoleIcon(user.role)}
-                                                    {user.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-zinc-600 font-mono text-xs">
-                                                {user.identifier}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {user.role === 'TEACHER' ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm text-zinc-600 font-medium">
-                                                            {user.courses?.length || 0} course{(user.courses?.length !== 1) ? 's' : ''}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => openCourseModal(user)}
-                                                            className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-zinc-100 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-600 rounded border border-zinc-200 transition-colors"
-                                                        >
-                                                            <BookOpen className="w-3 h-3" />
-                                                            Manage
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-zinc-400">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-zinc-500">
-                                                {new Date(user.createdAt).toLocaleDateString(undefined, {
-                                                    year: 'numeric',
-                                                    month: 'short',
-                                                    day: 'numeric'
-                                                })}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => handleDeleteUser(user.id, user.name)}
-                                                    className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete User"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                {/* Users Table Sections */}
+                {loading ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-12 text-center text-zinc-500">
+                        Loading users...
+                    </div>
+                ) : error ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-12 text-center space-y-3">
+                        <p className="text-red-500 font-medium text-sm">{error}</p>
+                        <button
+                            onClick={fetchUsers}
+                            className="text-sm px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg transition-colors"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        {renderUserTable('Teachers', users.filter(u => u.role === 'TEACHER'), true)}
+                        {renderUserTable('Students', users.filter(u => u.role === 'STUDENT'), false)}
+                        {renderUserTable('Class Representatives (CRs)', users.filter(u => u.role === 'CR'), false)}
+                    </>
+                )}
             </div>
 
             {/* Add User Modal */}

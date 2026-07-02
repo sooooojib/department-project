@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { Users, Lock } from 'lucide-react';
 
 export default function LoginPage() {
     const router = useRouter();
-    const [identifier, setIdentifier] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -17,29 +18,29 @@ export default function LoginPage() {
         setError('');
         setLoading(true);
 
-        if (!identifier || !password) {
+        if (!email || !password) {
             setError('Fields are required');
             setLoading(false);
             return;
         }
 
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ identifier, password }),
+            const res = await signIn('credentials', {
+                redirect: false,
+                identifier: email,
+                password,
             });
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.message || 'Login failed');
+            if (res?.error) {
+                setError(res.error || 'Login failed');
                 setLoading(false);
                 return;
             }
 
-            router.push('/dashboard');
-            router.refresh();
+            if (res?.ok) {
+                router.push('/dashboard');
+                router.refresh();
+            }
         } catch (err) {
             setError('An unexpected error occurred. Please try again.');
         } finally {
@@ -96,20 +97,20 @@ export default function LoginPage() {
                                 </div>
                             )}
 
-                            {/* Email / ID field */}
+                            {/* Email field */}
                             <div className="space-y-1.5 w-full">
                                 <label className="block text-xs font-semibold text-gray-500 ml-3">
-                                    Email, Student ID, or Phone
+                                    Email Address
                                 </label>
                                 <div className="relative flex items-center w-full">
                                     <input
-                                        id="identifier"
-                                        name="identifier"
-                                        type="text"
+                                        id="email"
+                                        name="email"
+                                        type="email"
                                         required
-                                        placeholder="Enter your identifier"
-                                        value={identifier}
-                                        onChange={(e) => setIdentifier(e.target.value)}
+                                        placeholder="Enter your email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         disabled={loading}
                                         className="w-full px-5 rounded-full text-sm text-gray-900 placeholder-gray-400 outline-none transition-all duration-200 border border-white focus:border-gray-400"
                                         style={{ height: '52px', backgroundColor: 'rgba(255, 255, 255, 0.7)' }}
@@ -173,7 +174,7 @@ export default function LoginPage() {
                 >
                     {/* Desk Illustration centered inside */}
                     <img
-                        src="/desk_illustration.png"
+                        src="/new_desk_illustration.png"
                         alt="Desk Setup Illustration"
                         className="w-[85%] h-auto object-contain z-10 mix-blend-multiply"
                     />

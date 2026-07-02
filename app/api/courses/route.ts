@@ -1,17 +1,42 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { cookies } from 'next/headers';
 
-// GET: List all courses (accessible by all authenticated users)
+// GET: List courses. For CR with ?crSemester=true, only return courses matching their semester.
 export async function GET(req: Request) {
     try {
-        const token = (await cookies()).get('token')?.value;
-        const payload = token ? await decrypt(token) : null;
+                const payload = await getServerSession(authOptions);
         if (!payload) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+        const url = new URL(req.url);
+        const crSemester = url.searchParams.get('crSemester') === 'true';
+
+        let whereClause: any = {};
+
+        if (crSemester && payload?.user?.role === 'CR') {
+            const user = await prisma.user.findUnique({
+                where: { id: payload?.user?.id },
+                select: { year: true, semester: true },
+            });
+            if (user?.year && user?.semester) {
+                whereClause = { year: user.year, semester: user.semester };
+            }
+        }
+
         const courses = await prisma.course.findMany({
-            select: { id: true, code: true, name: true, description: true, credit: true, year: true, semester: true },
+            where: whereClause,
+            select: {
+                id: true,
+                code: true,
+                name: true,
+                description: true,
+                credit: true,
+                year: true,
+                semester: true,
+                teachers: { select: { id: true, name: true } },
+            },
             orderBy: { code: 'asc' },
         });
 

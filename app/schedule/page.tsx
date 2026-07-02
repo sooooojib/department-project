@@ -1,18 +1,15 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import prisma from '@/lib/prisma';
 import ScheduleClientPage from './page.client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SchedulePage() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
 
-    if (!token) redirect('/login');
 
-    const session = await decrypt(token);
+    const session = await getServerSession(authOptions);
     if (!session) redirect('/login');
 
     const slots = await prisma.scheduleSlot.findMany({
@@ -30,11 +27,17 @@ export default async function SchedulePage() {
         endTime: slot.endTime.toISOString(),
     }));
 
+    const allTeachers = await prisma.user.findMany({
+        where: { role: 'TEACHER' },
+        select: { id: true, name: true, phone: true }
+    });
+
     return (
         <ScheduleClientPage
             initialSlots={serializedSlots}
-            sessionRole={session.role}
-            userId={session.userId as string}
+            sessionRole={session?.user?.role}
+            userId={session?.user?.id as string}
+            allTeachers={allTeachers}
         />
     );
 }

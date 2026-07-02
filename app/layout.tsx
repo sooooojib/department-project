@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
-import { cookies } from 'next/headers';
-import { decrypt } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
+import Providers from './Providers';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,10 +26,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('token')?.value;
-  const payload = token ? await decrypt(token) : null;
-  const role = payload?.role || null;
+  const payload = await getServerSession(authOptions);
+  const role = payload?.user?.role || null;
 
   // Exclude sidebar margin on public pages
   const isAuth = !!role;
@@ -41,10 +40,12 @@ export default async function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;1,400;1,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f4f7f6] min-h-screen text-slate-800`}>
-        <Sidebar role={role as any} />
-        <main className={`transition-all duration-300 ${isAuth ? 'ml-0 md:ml-[72px]' : ''}`}>
-          {children}
-        </main>
+        <Providers>
+          <Sidebar role={role as any} />
+          <main className={`transition-all duration-300 ${isAuth ? 'ml-0 md:ml-[72px]' : ''}`}>
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

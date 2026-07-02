@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 export default function CounselingPage() {
     const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN' | 'CR' | null>(null);
     const [slots, setSlots] = useState<any[]>([]);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -29,8 +30,9 @@ export default function CounselingPage() {
 
             const slotsRes = await fetch('/api/counseling');
             if (slotsRes.ok) {
-                const { slots: data } = await slotsRes.json();
+                const { slots: data, currentUserId: uid } = await slotsRes.json();
                 setSlots(data);
+                if (uid) setCurrentUserId(uid);
             }
         } catch (err) {
             console.error('Failed to load counseling data');
@@ -49,11 +51,15 @@ export default function CounselingPage() {
     };
 
     const handleSlotClick = (slot: any) => {
+        // Students/CR: only allow clicking on available slots they haven't already booked
         if (role === 'STUDENT' || role === 'CR') {
-            setSelectedSlot(slot);
+            const myRequest = slot.requests?.find((r: any) => r.studentId === currentUserId);
+            const isBookedByOther = slot.requests?.some((r: any) => r.status === 'APPROVED' && r.studentId !== currentUserId);
+            if (!isBookedByOther && !myRequest) {
+                setSelectedSlot(slot);
+            }
         }
         if (role === 'TEACHER') {
-            // Teacher views the details
             setSelectedSlot(slot);
         }
     };
@@ -86,6 +92,13 @@ export default function CounselingPage() {
 
     const handleCreateSlot = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Prevent opening slots in the past
+        if (new Date(newStartTime) < new Date()) {
+            showMessage('error', 'Cannot create a slot in the past.');
+            return;
+        }
+
         setSubmitting(true);
         try {
             const res = await fetch('/api/counseling', {
@@ -204,6 +217,7 @@ export default function CounselingPage() {
                             type="datetime-local"
                             className="w-full border border-zinc-300 rounded-md p-2 focus:ring-emerald-500"
                             value={newStartTime} onChange={e => setNewStartTime(e.target.value)}
+                            min={new Date().toISOString().slice(0, 16)}
                         />
                     </div>
                     <div className="flex-1 w-full">
@@ -212,6 +226,7 @@ export default function CounselingPage() {
                             type="datetime-local"
                             className="w-full border border-zinc-300 rounded-md p-2 focus:ring-emerald-500"
                             value={newEndTime} onChange={e => setNewEndTime(e.target.value)}
+                            min={new Date().toISOString().slice(0, 16)}
                         />
                     </div>
                     <button
@@ -225,7 +240,7 @@ export default function CounselingPage() {
             )}
 
             {/* The shared Calendar UI */}
-            <Calendar slots={slots} role={role || 'STUDENT'} onSlotClick={handleSlotClick} />
+            <Calendar slots={slots} role={role || 'STUDENT'} onSlotClick={handleSlotClick} currentUserId={currentUserId} />
 
             {/* MODAL / OVERLAY */}
             {selectedSlot && (
@@ -248,13 +263,43 @@ export default function CounselingPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-700 mb-2">Purpose of visit</label>
-                                    <textarea
-                                        required
-                                        value={purpose}
-                                        onChange={e => setPurpose(e.target.value)}
-                                        placeholder="E.g., Class issue, Academic advising, Department matter..."
-                                        className="w-full border border-zinc-300 rounded-md p-3 h-24 resize-none focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    />
+                                    <div className="relative group">
+                                        <input
+                                            type="text"
+                                            required
+                                            value={purpose}
+                                            onChange={e => setPurpose(e.target.value)}
+                                            onFocus={(e) => {
+                                                const dropdown = e.target.nextElementSibling;
+                                                if (dropdown) dropdown.classList.remove('hidden');
+                                            }}
+                                            onBlur={(e) => {
+                                                const dropdown = e.target.nextElementSibling;
+                                                if (dropdown) setTimeout(() => dropdown.classList.add('hidden'), 200);
+                                            }}
+                                            placeholder="Search or type a reason..."
+                                            className="w-full border border-zinc-300 rounded-md p-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        />
+                                        <div className="hidden absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                            {['Academic Advising', 'Research Discussion', 'Mental Pressure', 'Class Issue', 'Career Guidance', 'Other']
+                                                .filter(r => r.toLowerCase().includes(purpose.toLowerCase()))
+                                                .map(reason => (
+                                                    <div
+                                                        key={reason}
+                                                        className="px-4 py-2 hover:bg-emerald-50 cursor-pointer text-sm text-zinc-700"
+                                                        onClick={() => setPurpose(reason)}
+                                                    >
+                                                        {reason}
+                                                    </div>
+                                                ))}
+                                            {['Academic Advising', 'Research Discussion', 'Mental Pressure', 'Class Issue', 'Career Guidance', 'Other']
+                                                .filter(r => r.toLowerCase().includes(purpose.toLowerCase())).length === 0 && (
+                                                <div className="px-4 py-2 text-sm text-zinc-500 italic">
+                                                    Custom reason will be used
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="flex gap-3 justify-end">
                                     <button type="button" onClick={() => setSelectedSlot(null)} className="px-5 py-2 text-zinc-600 hover:bg-zinc-100 rounded-md transition-colors">Cancel</button>
