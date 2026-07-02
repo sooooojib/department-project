@@ -36,7 +36,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
 
         if (action === 'approve') {
             // 1. Generate random password
-            const rawPassword = 'deptcore-' + crypto.randomBytes(4).toString('hex');
+            const rawPassword = 'eduportal-' + crypto.randomBytes(4).toString('hex');
             
             // 2. Hash password
             const hashedPassword = await hash(rawPassword, 10);

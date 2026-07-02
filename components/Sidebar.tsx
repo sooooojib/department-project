@@ -88,7 +88,7 @@ export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN
                     </svg>
                 </div>
                 <span className={`text-xl font-bold tracking-tight text-slate-800 ml-4 transition-opacity whitespace-nowrap ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-                    DeptCore
+                    EduPortal
                 </span>
             </div>
 
