@@ -178,7 +178,7 @@ export default async function StudentDashboard() {
     return (
         <div className="p-8 max-w-[1600px] mx-auto space-y-6">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-[26px] font-extrabold text-[#111827] tracking-tight">Dashboard</h1>
+                <h1 className="text-[26px] font-extrabold text-[#111827] tracking-tight">Student Dashboard</h1>
                 <div className="flex items-center space-x-2 bg-white px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 font-semibold shadow-sm">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
