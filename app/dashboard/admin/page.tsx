@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
 import { Users, Shield, GraduationCap, UserCircle, Plus, Trash2, X, BookOpen } from 'lucide-react';
 import PendingSignupsWidget from '@/components/PendingSignupsWidget';
+import SemesterRequestsWidget from '@/components/SemesterRequestsWidget';
 
 interface UserData {
     id: string;
@@ -311,6 +312,9 @@ export default function AdminDashboard() {
 
                 {/* Pending Signups Widget */}
                 <PendingSignupsWidget />
+
+                {/* Semester Requests Widget */}
+                <SemesterRequestsWidget />
 
                 {/* Users Table Sections */}
                 {loading ? (
