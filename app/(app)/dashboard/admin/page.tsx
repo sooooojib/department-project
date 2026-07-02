@@ -22,6 +22,7 @@ interface UserData {
     name: string;
     role: string;
     identifier: string;
+    studentId?: string | null;
     createdAt: string;
     courses?: { id: string; name: string; code: string }[];
 }
@@ -215,7 +216,14 @@ export default function AdminDashboard() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-zinc-600 font-mono text-xs">
-                                        {user.identifier}
+                                        <div className="flex flex-col gap-1">
+                                            <span>{user.identifier}</span>
+                                            {user.studentId && user.studentId !== user.identifier && (
+                                                <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">
+                                                    ID: {user.studentId}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     {showCourses && (
                                         <td className="px-6 py-4">

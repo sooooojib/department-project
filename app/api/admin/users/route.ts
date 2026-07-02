@@ -38,6 +38,7 @@ export async function GET(req: Request) {
             name: u.name,
             role: u.role,
             identifier: u.email || u.studentId || u.phone || 'N/A',
+            studentId: u.studentId, // <-- Include this
             createdAt: u.createdAt,
             courses: u.courses || []
         }));
