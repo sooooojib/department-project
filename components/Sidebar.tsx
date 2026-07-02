@@ -101,6 +101,7 @@ export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN
                         <Link
                             key={link.href}
                             href={link.href}
+                            prefetch={false}
                             onMouseEnter={() => {
                                 const endpoints = PREFETCH_MAP[link.href];
                                 if (endpoints) {

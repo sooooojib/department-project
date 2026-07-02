@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { signIn } from 'next-auth/react';
-import { CreditCard, User, IdCard, Lock, ChevronDown } from 'lucide-react';
+import { CreditCard, User, IdCard, Lock, ChevronDown, Users, BookOpen } from 'lucide-react';
 
 const inputBase: React.CSSProperties = {
     background: '#f9fafb',
@@ -218,7 +219,7 @@ export default function SignupPage() {
 
                     <div className="mt-auto flex gap-1 items-center justify-start text-xs text-gray-500 w-full pt-6">
                         <span>Already have an account?</span>
-                        <Link href="/login" className="font-semibold text-gray-800 underline decoration-1 underline-offset-4 hover:text-gray-900">
+                        <Link href="/login" prefetch={false} className="font-semibold text-gray-800 underline decoration-1 underline-offset-4 hover:text-gray-900">
                             Log in
                         </Link>
                     </div>
@@ -230,9 +231,12 @@ export default function SignupPage() {
                     style={{ borderRadius: '2rem' }}
                 >
                     {/* Desk Illustration centered inside */}
-                    <img
+                    <Image
                         src="/new_desk_illustration.png"
                         alt="Desk Setup Illustration"
+                        width={600}
+                        height={500}
+                        priority={true}
                         className="w-[85%] h-auto object-contain z-10 mix-blend-multiply"
                     />
 

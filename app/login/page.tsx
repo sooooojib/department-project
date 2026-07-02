@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { signIn } from 'next-auth/react';
 import { Users, Lock } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function LoginPage() {
 
             if (res?.ok) {
                 router.push('/dashboard');
-                router.refresh();
+                // Removed redundant router.refresh() here to prevent duplicate _rsc requests
             }
         } catch (err) {
             setError('An unexpected error occurred. Please try again.');
@@ -161,7 +162,7 @@ export default function LoginPage() {
 
                     <div className="mt-auto flex gap-1 items-center justify-start text-xs text-gray-500 w-full pt-6">
                         <span>Don&rsquo;t have an account?</span>
-                        <Link href="/signup" className="font-semibold text-gray-800 underline decoration-1 underline-offset-4 hover:text-gray-900">
+                        <Link href="/signup" prefetch={false} className="font-semibold text-gray-800 underline decoration-1 underline-offset-4 hover:text-gray-900">
                             Sign up
                         </Link>
                     </div>
@@ -173,9 +174,12 @@ export default function LoginPage() {
                     style={{ borderRadius: '2rem' }}
                 >
                     {/* Desk Illustration centered inside */}
-                    <img
+                    <Image
                         src="/new_desk_illustration.png"
                         alt="Desk Setup Illustration"
+                        width={600}
+                        height={500}
+                        priority={true}
                         className="w-[85%] h-auto object-contain z-10 mix-blend-multiply"
                     />
 
