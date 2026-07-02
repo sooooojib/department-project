@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
 import Providers from './Providers';
 
 const geistSans = Geist({
@@ -21,17 +18,11 @@ export const metadata: Metadata = {
   description: "University department management system",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const payload = await getServerSession(authOptions);
-  const role = payload?.user?.role || null;
-
-  // Exclude sidebar margin on public pages
-  const isAuth = !!role;
-
   return (
     <html lang="en">
       <head>
@@ -41,10 +32,7 @@ export default async function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f4f7f6] min-h-screen text-slate-800`}>
         <Providers>
-          <Sidebar role={role as any} />
-          <main className={`transition-all duration-300 ${isAuth ? 'ml-0 md:ml-[72px]' : ''}`}>
-            {children}
-          </main>
+          {children}
         </Providers>
       </body>
     </html>

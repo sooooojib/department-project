@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Calendar from '@/components/Calendar';
 import { format } from 'date-fns';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 
 export default function CounselingPage() {
-    const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN' | 'CR' | null>(null);
-    const [slots, setSlots] = useState<any[]>([]);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: sessionData, isLoading: loadingRole } = useSWR('/api/auth/session', fetcher);
+    const { data: counselingData, mutate: mutateCounseling, isLoading: loadingCounseling } = useSWR('/api/counseling', fetcher);
+
+    const role = sessionData?.user?.role || null;
+    const slots = counselingData?.slots || [];
+    const currentUserId = counselingData?.currentUserId || null;
+    const loading = loadingRole || loadingCounseling;
 
     // Form states
     const [selectedSlot, setSelectedSlot] = useState<any>(null); // For active modal
@@ -20,30 +25,7 @@ export default function CounselingPage() {
     const [newStartTime, setNewStartTime] = useState('');
     const [newEndTime, setNewEndTime] = useState('');
 
-    const fetchData = async () => {
-        try {
-            const roleRes = await fetch('/api/auth/me');
-            if (roleRes.ok) {
-                const { role: userRole } = await roleRes.json();
-                setRole(userRole);
-            }
 
-            const slotsRes = await fetch('/api/counseling');
-            if (slotsRes.ok) {
-                const { slots: data, currentUserId: uid } = await slotsRes.json();
-                setSlots(data);
-                if (uid) setCurrentUserId(uid);
-            }
-        } catch (err) {
-            console.error('Failed to load counseling data');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const showMessage = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
@@ -78,7 +60,7 @@ export default function CounselingPage() {
                 showMessage('success', 'Counseling request submitted!');
                 setSelectedSlot(null);
                 setPurpose('');
-                fetchData();
+                mutateCounseling();
             } else {
                 const { message: err } = await res.json();
                 showMessage('error', err || 'Failed to request slot');
@@ -110,7 +92,7 @@ export default function CounselingPage() {
                 showMessage('success', 'Available slot created!');
                 setNewStartTime('');
                 setNewEndTime('');
-                fetchData();
+                mutateCounseling();
             } else {
                 showMessage('error', 'Failed to create slot');
             }
@@ -133,7 +115,7 @@ export default function CounselingPage() {
 
             if (res.ok) {
                 showMessage('success', `Request marked as ${newStatus}`);
-                fetchData();
+                mutateCounseling();
                 setSelectedSlot(null); // Close modal
             } else {
                 const { message: err } = await res.json();

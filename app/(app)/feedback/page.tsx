@@ -1,15 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import FeedbackCard from '@/components/FeedbackCard';
 
 export default function FeedbackPage() {
     const router = useRouter();
-    const [feedbacks, setFeedbacks] = useState<any[]>([]);
-    const [teachers, setTeachers] = useState<any[]>([]);
-    const [role, setRole] = useState<'STUDENT' | 'TEACHER' | 'ADMIN' | 'CR' | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: feedbacksData, mutate: mutateFeedbacks, isLoading: loadingFeedbacks } = useSWR('/api/feedback', fetcher);
+    const { data: teachersData, isLoading: loadingTeachers } = useSWR('/api/users?role=TEACHER', fetcher);
+    const { data: sessionData, isLoading: loadingRole } = useSWR('/api/auth/session', fetcher);
+
+    const feedbacks = feedbacksData?.feedbacks || [];
+    const teachers = teachersData?.users || [];
+    const role = sessionData?.user?.role || null;
+    const loading = loadingFeedbacks || loadingTeachers || loadingRole;
 
     // Form state
     const [selectedTeacher, setSelectedTeacher] = useState('');
@@ -22,49 +28,7 @@ export default function FeedbackPage() {
     const [file, setFile] = useState<File | null>(null);
     const [filterMode, setFilterMode] = useState<'ALL' | 'REPLIED' | 'NOT_REPLIED'>('ALL');
 
-    const fetchFeedbacks = async () => {
-        try {
-            const fbRes = await fetch('/api/feedback');
-            if (fbRes.ok) {
-                const data = await fbRes.json();
-                setFeedbacks(data.feedbacks);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
-    useEffect(() => {
-        const fetchContext = async () => {
-            try {
-                await fetchFeedbacks();
-
-                const teacherRes = await fetch('/api/users?role=TEACHER');
-                if (teacherRes.ok) {
-                    const data = await teacherRes.json();
-                    setTeachers(data.users || []);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchContext();
-    }, []);
-
-    const fetchRole = async () => {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-            const data = await res.json();
-            setRole(data.role);
-        }
-    };
-
-    useEffect(() => {
-        fetchRole();
-    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,7 +74,7 @@ export default function FeedbackPage() {
             setFile(null);
 
             // Refresh feedback list
-            await fetchFeedbacks();
+            mutateFeedbacks();
 
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred.');
@@ -149,7 +113,7 @@ export default function FeedbackPage() {
                                     onChange={e => setSelectedTeacher(e.target.value)}
                                 >
                                     <option value="" disabled>Choose a teacher...</option>
-                                    {teachers.map(t => (
+                                    {teachers.map((t: any) => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
                                 </select>
@@ -245,7 +209,7 @@ export default function FeedbackPage() {
                 </div>
 
                 {(() => {
-                    const filtered = feedbacks.filter(fb => {
+                    const filtered = feedbacks.filter((fb: any) => {
                         if (filterMode === 'REPLIED') return !!fb.reply || !!fb.replyAttachmentUrl;
                         if (filterMode === 'NOT_REPLIED') return !fb.reply && !fb.replyAttachmentUrl;
                         return true;
@@ -257,8 +221,8 @@ export default function FeedbackPage() {
 
                     return (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {filtered.map(fb => (
-                                <FeedbackCard key={fb.id} feedback={fb} viewerRole={role || 'STUDENT'} onReplySubmitted={fetchFeedbacks} />
+                            {filtered.map((fb: any) => (
+                                <FeedbackCard key={fb.id} feedback={fb} viewerRole={role || 'STUDENT'} onReplySubmitted={() => mutateFeedbacks()} />
                             ))}
                         </div>
                     );

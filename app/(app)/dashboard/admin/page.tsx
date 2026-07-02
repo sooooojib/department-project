@@ -1,11 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import LogoutButton from '@/components/LogoutButton';
 import { Users, Shield, GraduationCap, UserCircle, Plus, Trash2, X, BookOpen } from 'lucide-react';
-import PendingSignupsWidget from '@/components/PendingSignupsWidget';
-import SemesterRequestsWidget from '@/components/SemesterRequestsWidget';
+const PendingSignupsWidget = dynamic(() => import('@/components/PendingSignupsWidget'), {
+    loading: () => <div className="p-8 text-center text-zinc-500 animate-pulse bg-white rounded-2xl shadow-sm border border-zinc-100">Loading signups...</div>,
+    ssr: false,
+});
+
+const SemesterRequestsWidget = dynamic(() => import('@/components/SemesterRequestsWidget'), {
+    loading: () => <div className="p-8 text-center text-zinc-500 animate-pulse bg-white rounded-2xl shadow-sm border border-zinc-100">Loading requests...</div>,
+    ssr: false,
+});
 
 interface UserData {
     id: string;
@@ -27,9 +37,20 @@ interface CourseData {
 
 export default function AdminDashboard() {
     const router = useRouter();
-    const [users, setUsers] = useState<UserData[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+
+    const { data: usersData, error: usersError, isLoading: usersLoading, mutate: mutateUsers } = useSWR('/api/admin/users', fetcher);
+    const { data: coursesData } = useSWR('/api/courses', fetcher);
+
+    const users: UserData[] = usersData?.users || [];
+    const allCourses: CourseData[] = coursesData?.courses || [];
+    const loading = usersLoading;
+    const error = usersError ? 'Could not load user data.' : '';
+
+    useEffect(() => {
+        if (usersError && (usersError.message.includes('Forbidden') || usersError.message.includes('Unauthorized'))) {
+            router.push('/login');
+        }
+    }, [usersError, router]);
 
     // Add user modal state
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -41,55 +62,11 @@ export default function AdminDashboard() {
     const [formError, setFormError] = useState('');
 
     // Course management state
-    const [allCourses, setAllCourses] = useState<CourseData[]>([]);
+    // Course management state
     const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState<UserData | null>(null);
     const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
     const [isSavingCourses, setIsSavingCourses] = useState(false);
-
-    const fetchUsers = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const res = await fetch('/api/admin/users');
-            if (!res.ok) {
-                if (res.status === 401 || res.status === 403) {
-                    router.push('/login');
-                    return;
-                }
-                // Try to get the actual error message from the server
-                let errMsg = `Server error (${res.status})`;
-                try {
-                    const errData = await res.json();
-                    if (errData?.message) errMsg = errData.message;
-                } catch {}
-                throw new Error(errMsg);
-            }
-            const data = await res.json();
-            setUsers(data.users);
-        } catch (err: any) {
-            setError(err.message || 'Could not load user data.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchAllCourses = async () => {
-        try {
-            const res = await fetch('/api/courses');
-            if (res.ok) {
-                const data = await res.json();
-                setAllCourses(data.courses);
-            }
-        } catch (err) {
-            console.error('Failed to fetch courses', err);
-        }
-    };
-
-    useEffect(() => {
-        fetchUsers();
-        fetchAllCourses();
-    }, [router]);
 
     const getRoleIcon = (role: string) => {
         switch (role) {
@@ -109,7 +86,7 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleCreateUser = async (e: React.FormEvent) => {
+    const handleCreateUser = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError('');
         setIsSubmitting(true);
@@ -137,15 +114,15 @@ export default function AdminDashboard() {
             setNewIdentifier('');
             setNewPassword('');
             setNewRole('STUDENT');
-            fetchUsers();
+            mutateUsers();
         } catch (err: any) {
             setFormError(err.message);
         } finally {
             setIsSubmitting(false);
         }
-    };
+    }, [newName, newIdentifier, newPassword, newRole, mutateUsers]);
 
-    const handleDeleteUser = async (userId: string, userName: string) => {
+    const handleDeleteUser = useCallback(async (userId: string, userName: string) => {
         if (!window.confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
             return;
         }
@@ -160,19 +137,19 @@ export default function AdminDashboard() {
                 throw new Error(data.message || 'Failed to delete user');
             }
 
-            setUsers(prev => prev.filter(u => u.id !== userId));
+            mutateUsers();
         } catch (err: any) {
             alert(err.message);
         }
-    };
+    }, [mutateUsers]);
 
-    const openCourseModal = (teacher: UserData) => {
+    const openCourseModal = useCallback((teacher: UserData) => {
         setSelectedTeacher(teacher);
         setSelectedCourseIds(teacher.courses?.map(c => c.id) || []);
         setIsCourseModalOpen(true);
-    };
+    }, []);
 
-    const handleSaveCourses = async () => {
+    const handleSaveCourses = useCallback(async () => {
         if (!selectedTeacher) return;
         setIsSavingCourses(true);
         try {
@@ -183,7 +160,7 @@ export default function AdminDashboard() {
             });
             if (res.ok) {
                 setIsCourseModalOpen(false);
-                fetchUsers();
+                mutateUsers();
             } else {
                 alert('Failed to save courses');
             }
@@ -192,16 +169,18 @@ export default function AdminDashboard() {
         } finally {
             setIsSavingCourses(false);
         }
-    };
+    }, [selectedTeacher, selectedCourseIds, mutateUsers]);
 
-    const groupedCourses = allCourses.reduce((acc, course) => {
-        const key = `Year ${course.year ?? '?'} - Semester ${course.semester ?? '?'}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(course);
-        return acc;
-    }, {} as Record<string, CourseData[]>);
+    const groupedCourses = useMemo(() => {
+        return allCourses.reduce((acc, course) => {
+            const key = `Year ${course.year ?? '?'} - Semester ${course.semester ?? '?'}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(course);
+            return acc;
+        }, {} as Record<string, CourseData[]>);
+    }, [allCourses]);
 
-    const sortedGroupKeys = Object.keys(groupedCourses).sort();
+    const sortedGroupKeys = useMemo(() => Object.keys(groupedCourses).sort(), [groupedCourses]);
 
     const renderUserTable = (title: string, data: UserData[], showCourses: boolean = false) => (
         <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden mb-8">
@@ -325,7 +304,7 @@ export default function AdminDashboard() {
                     <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-12 text-center space-y-3">
                         <p className="text-red-500 font-medium text-sm">{error}</p>
                         <button
-                            onClick={fetchUsers}
+                            onClick={() => mutateUsers()}
                             className="text-sm px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg transition-colors"
                         >
                             Retry

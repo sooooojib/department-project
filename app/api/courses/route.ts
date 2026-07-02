@@ -40,7 +40,12 @@ export async function GET(req: Request) {
             orderBy: { code: 'asc' },
         });
 
-        return NextResponse.json({ courses }, { status: 200 });
+        return NextResponse.json({ courses }, { 
+            status: 200,
+            headers: {
+                'Cache-Control': 's-maxage=60, stale-while-revalidate'
+            }
+        });
     } catch (error) {
         console.error('Courses GET error:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

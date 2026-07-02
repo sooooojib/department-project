@@ -4,6 +4,19 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import { preload } from 'swr';
+import { fetcher } from '@/lib/fetcher';
+
+const PREFETCH_MAP: Record<string, string[]> = {
+    '/feedback': ['/api/feedback', '/api/users?role=TEACHER', '/api/auth/session'],
+    '/counseling': ['/api/auth/session', '/api/counseling'],
+    '/dashboard/admin': [
+        '/api/admin/users', 
+        '/api/courses', 
+        '/api/admin/semester-requests', 
+        '/api/admin/signup-requests'
+    ]
+};
 
 export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN' | 'CR' | null }) {
     const pathname = usePathname();
@@ -88,6 +101,22 @@ export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN
                         <Link
                             key={link.href}
                             href={link.href}
+                            onMouseEnter={() => {
+                                const endpoints = PREFETCH_MAP[link.href];
+                                if (endpoints) {
+                                    endpoints.forEach(url => {
+                                        try {
+                                            const promise = preload(url, fetcher);
+                                            // Preload can return a promise that rejects if unauthorized
+                                            if (promise && typeof promise.catch === 'function') {
+                                                promise.catch(() => {});
+                                            }
+                                        } catch (e) {
+                                            // Ignore sync errors
+                                        }
+                                    });
+                                }
+                            }}
                             className={`flex items-center px-2.5 py-2.5 rounded-lg transition-all duration-200 ${isActive
                                     ? 'bg-emerald-50 text-emerald-800 font-semibold before:absolute before:left-0 before:h-8 before:w-1 before:bg-emerald-500 before:rounded-r-md'
                                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 font-medium'

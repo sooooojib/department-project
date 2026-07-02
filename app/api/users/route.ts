@@ -44,7 +44,12 @@ export async function GET(req: Request) {
                 phone: s.phone,
             }));
 
-            return NextResponse.json({ students }, { status: 200 });
+            return NextResponse.json({ students }, { 
+                status: 200,
+                headers: {
+                    'Cache-Control': 's-maxage=60, stale-while-revalidate'
+                }
+            });
         }
 
         let users: { id: string; name: string; identifier: string; }[] = [];
@@ -63,7 +68,12 @@ export async function GET(req: Request) {
             }));
         }
 
-        return NextResponse.json({ users }, { status: 200 });
+        return NextResponse.json({ users }, { 
+            status: 200,
+            headers: {
+                'Cache-Control': 's-maxage=60, stale-while-revalidate'
+            }
+        });
     } catch (error) {
         console.error('Users GET error:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

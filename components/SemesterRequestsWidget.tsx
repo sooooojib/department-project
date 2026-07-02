@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/fetcher';
 import { CheckCircle, XCircle, BookOpen } from 'lucide-react';
 
 type SemesterRequest = {
@@ -14,30 +16,16 @@ type SemesterRequest = {
 };
 
 export default function SemesterRequestsWidget() {
-    const [requests, setRequests] = useState<SemesterRequest[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data, error: swrError, isLoading: loading, mutate: mutateRequests } = useSWR('/api/admin/semester-requests', fetcher);
+    const requests: SemesterRequest[] = data?.requests || [];
     const [actionLoading, setActionLoading] = useState<string | null>(null); // Request ID
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        fetchRequests();
-    }, []);
+    if (swrError) {
+        if (!error) setError(swrError.message || 'Error connecting to server');
+    }
 
-    const fetchRequests = async () => {
-        try {
-            const res = await fetch('/api/admin/semester-requests');
-            const data = await res.json();
-            if (res.ok) {
-                setRequests(data.requests);
-            } else {
-                setError(data.message || 'Failed to load requests');
-            }
-        } catch (err) {
-            setError('Error connecting to server');
-        } finally {
-            setLoading(false);
-        }
-    };
+
 
     const handleAction = async (id: string, action: 'APPROVE' | 'REJECT') => {
         setActionLoading(id);
@@ -53,7 +41,7 @@ export default function SemesterRequestsWidget() {
             const data = await res.json();
             
             if (res.ok) {
-                setRequests((prev) => prev.filter((req) => req.id !== id));
+                mutateRequests();
                 if (action === 'APPROVE') {
                     alert('Semester request approved successfully.');
                 }

@@ -43,6 +43,10 @@ model User {
   bookedSlots       ScheduleSlot[]      @relation("BookedSchedule")
   examsCreated      Exam[]              @relation("ExamCreator")
   courses           Course[]            @relation("TeacherCourses")
+
+  @@index([role])
+  @@index([semesterStatus])
+  @@index([createdAt])
 }
 
 model Feedback {
@@ -81,6 +85,8 @@ model Course {
   sessions    AttendanceSession[]
   exams       Exam[]
   teachers    User[]   @relation("TeacherCourses")
+
+  @@index([year, semester])
 }
 
 model AttendanceSession {
@@ -190,4 +196,7 @@ model SignupRequest {
   identifier String        // Student ID, phone, etc.
   status     RequestStatus @default(PENDING)
   createdAt  DateTime      @default(now())
+
+  @@index([status])
+  @@index([createdAt])
 }

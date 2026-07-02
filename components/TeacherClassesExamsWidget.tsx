@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 interface ClassSlot {
     id: string;
@@ -33,9 +34,9 @@ export default function TeacherClassesExamsWidget({ classes, exams, classLabel }
             {/* Header */}
             <div className="flex justify-between items-center mb-5">
                 <h2 className="text-lg font-bold text-slate-800">Class and Exam</h2>
-                <a href="/schedule" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                <Link href="/schedule" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
                     View full calendar &rarr;
-                </a>
+                </Link>
             </div>
 
             {/* Main Tab Bar: Classes | Exams */}
