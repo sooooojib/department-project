@@ -225,15 +225,15 @@ export default async function StudentDashboard() {
                     icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                     trend="1.0%" trendPositive={false}
                 />
-                {/* Class Schedule link */}
+                {/* Counseling link */}
                 <Link
-                    href="/schedule"
+                    href="/counseling"
                     className="bg-slate-50/50 p-5 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50/50 transition-all text-center"
                 >
                     <svg className="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span className="font-semibold text-[13px] uppercase tracking-wide">Class Schedule</span>
+                    <span className="font-semibold text-[13px] uppercase tracking-wide">Counseling</span>
                 </Link>
             </div>
 
