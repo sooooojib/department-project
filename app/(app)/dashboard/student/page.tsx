@@ -61,7 +61,7 @@ function ClassesSkeleton() {
 
 function CoursesSkeleton() {
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col lg:col-span-2 animate-pulse">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col animate-pulse">
             <div className="h-5 w-48 bg-slate-200 rounded mb-6" />
             {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex flex-col pb-4 mb-4 border-b border-slate-100 last:border-0 last:mb-0">

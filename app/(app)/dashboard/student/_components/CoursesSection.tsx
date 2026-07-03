@@ -13,7 +13,7 @@ interface Props {
 export default async function CoursesSection({ userId, year, semester }: Props) {
     if (!year || !semester) {
         return (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col lg:col-span-2">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col">
                 <h2 className="text-lg font-bold text-slate-800 mb-6">Current Semester Courses</h2>
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center h-full">
                     <svg className="w-12 h-12 mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,7 +44,7 @@ export default async function CoursesSection({ userId, year, semester }: Props) 
 
     if (courses.length === 0) {
         return (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col lg:col-span-2">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col">
                 <h2 className="text-lg font-bold text-slate-800 mb-6">Current Semester Courses</h2>
                 <div className="text-center py-12 text-slate-400">
                     <p className="text-sm font-semibold text-slate-500">Syllabus Unpopulated</p>
