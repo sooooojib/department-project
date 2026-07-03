@@ -5,9 +5,10 @@ import { signOut } from 'next-auth/react';
 export default function LogoutButton() {
     const handleLogout = async () => {
         try {
-            await signOut({ callbackUrl: '/login' });
+            await signOut({ redirect: true, callbackUrl: '/login' });
         } catch (error) {
             console.error('Logout failed:', error);
+            window.location.href = '/login';
         }
     };
 

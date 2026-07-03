@@ -28,9 +28,11 @@ export default function Sidebar({ role }: { role: 'STUDENT' | 'TEACHER' | 'ADMIN
 
     const handleLogout = async () => {
         try {
-            await signOut({ callbackUrl: '/login' });
+            await signOut({ redirect: true, callbackUrl: '/login' });
         } catch (error) {
             console.error('Logout failed:', error);
+            // Force hard redirect if signOut fails
+            window.location.href = '/login';
         }
     };
 
