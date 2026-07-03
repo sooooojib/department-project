@@ -145,16 +145,47 @@ export default function LoginPage() {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full text-gray-900 font-bold transition-all duration-200"
+                                    className={`
+                                        w-full font-bold flex items-center justify-center gap-2
+                                        transition-all duration-200
+                                        ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'}
+                                    `}
                                     style={{
                                         height: '52px',
                                         background: loading ? '#fce28b' : '#FCD043',
                                         borderRadius: '9999px',
-                                        boxShadow: '0 8px 20px rgba(252, 208, 67, 0.3)',
-                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                        boxShadow: loading
+                                            ? 'none'
+                                            : '0 8px 20px rgba(252, 208, 67, 0.3)',
+                                        color: '#1a1a1a',
                                     }}
                                 >
-                                    {loading ? 'Logging in...' : 'Log In'}
+                                    {loading ? (
+                                        <>
+                                            {/* Animated spinner */}
+                                            <svg
+                                                className="animate-spin h-4 w-4 text-gray-700 shrink-0"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12" cy="12" r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                                />
+                                            </svg>
+                                            Logging in...
+                                        </>
+                                    ) : (
+                                        'Log In'
+                                    )}
                                 </button>
                             </div>
                         </form>
